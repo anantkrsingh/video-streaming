@@ -23,4 +23,4 @@ RUN mkdir -p /app
 EXPOSE 3000
 
 # Start the server (use node instead of nodemon for production)
-CMD ["/bin/sh", "-c", "printf \"%s\" \"$GCP_SERVICE_ACCOUNT\" > /app/service-account.json && chmod 600 /app/service-account.json && node server.js"]
+CMD ["/bin/sh", "-c", "printf \"%s\" \"$GCP_SERVICE_ACCOUNT\" > /app/service-account.json && chmod 600 /app/service-account.json && node index.js"]
