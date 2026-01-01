@@ -5,7 +5,6 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SocketProvider } from './contexts/SocketContext';
 import Login from './components/Login';
 import Register from './components/Register';
-import Dashboard from './components/Dashboard';
 import VideoList from './components/VideoList';
 import VideoUpload from './components/VideoUpload';
 import VideoPlayer from './components/VideoPlayer';
@@ -59,15 +58,6 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 
-                {/* Protected Routes */}
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                />
                 {/* Public Route - Video listing */}
                 <Route
                   path="/"

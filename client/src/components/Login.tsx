@@ -15,7 +15,7 @@ import {
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, Navigate } from 'react-router-dom';
 
 /**
  * Login Component
@@ -155,7 +155,7 @@ const Login: React.FC = () => {
                     setError('');
                     if (credentialResponse.credential) {
                       await loginWithGoogle(credentialResponse.credential);
-                      navigate('/dashboard');
+                      navigate('/');
                     }
                   } catch (err: any) {
                     setError(
