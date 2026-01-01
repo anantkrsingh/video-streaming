@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
-import { useNavigate, Link as RouterLink } from 'react-router-dom';
+import { useNavigate, Link as RouterLink, Navigate } from 'react-router-dom';
 
 /**
  * Register Component
@@ -31,8 +31,13 @@ const Register: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { register } = useAuth();
+  const { register, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  if (!authLoading && isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   /**
    * Handle form submission
@@ -64,8 +69,8 @@ const Register: React.FC = () => {
 
     try {
       await register(name, email, password);
-      // Redirect to dashboard/home after successful registration
-      navigate('/dashboard');
+      // Redirect to home after successful registration
+      navigate('/');
     } catch (err: any) {
       setError(
         err.response?.data?.message || 'Registration failed. Please try again.'

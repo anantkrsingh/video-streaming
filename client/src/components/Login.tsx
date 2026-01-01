@@ -29,8 +29,13 @@ const Login: React.FC = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login, loginWithGoogle } = useAuth();
+  const { login, loginWithGoogle, isAuthenticated, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+
+  // Redirect if already authenticated
+  if (!authLoading && isAuthenticated) {
+    return <Navigate to="/" replace />;
+  }
 
   /**
    * Handle form submission
@@ -50,8 +55,8 @@ const Login: React.FC = () => {
 
     try {
       await login(email, password);
-      // Redirect to dashboard/home after successful login
-      navigate('/dashboard');
+      // Redirect to home after successful login
+      navigate('/');
     } catch (err: any) {
       setError(
         err.response?.data?.message || 'Login failed. Please check your credentials.'

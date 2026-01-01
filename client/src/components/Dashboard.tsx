@@ -87,8 +87,8 @@ const Dashboard: React.FC = () => {
                   Upload and manage your video content. Videos will be processed
                   for sensitivity analysis.
                 </Typography>
-                <Button variant="contained" disabled>
-                  Coming Soon
+                <Button variant="contained" onClick={() => navigate('/upload')}>
+                  Upload Video
                 </Button>
               </CardContent>
             </Card>
@@ -105,8 +105,8 @@ const Dashboard: React.FC = () => {
                   Browse and stream your uploaded videos. View processing status
                   and manage your content.
                 </Typography>
-                <Button variant="contained" disabled>
-                  Coming Soon
+                <Button variant="contained" onClick={() => navigate('/')}>
+                  View Videos
                 </Button>
               </CardContent>
             </Card>

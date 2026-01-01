@@ -2,9 +2,13 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider } from './contexts/AuthContext';
+import { SocketProvider } from './contexts/SocketContext';
 import Login from './components/Login';
 import Register from './components/Register';
 import Dashboard from './components/Dashboard';
+import VideoList from './components/VideoList';
+import VideoUpload from './components/VideoUpload';
+import OrganizationDashboard from './components/OrganizationDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
 
@@ -47,29 +51,52 @@ function App() {
       <ThemeProvider theme={theme}>
         <CssBaseline />
         <AuthProvider>
-          <Router>
-            <Routes>
-              {/* Public Routes */}
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              
-              {/* Protected Routes */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
-              
-              {/* Default redirect */}
-              <Route path="/" element={<Navigate to="/dashboard" replace />} />
-              
-              {/* Catch all - redirect to dashboard */}
-              <Route path="*" element={<Navigate to="/dashboard" replace />} />
-            </Routes>
-          </Router>
+          <SocketProvider>
+            <Router>
+              <Routes>
+                {/* Public Routes */}
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                
+                {/* Protected Routes */}
+                <Route
+                  path="/dashboard"
+                  element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/"
+                  element={
+                    <ProtectedRoute>
+                      <VideoList />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/upload"
+                  element={
+                    <ProtectedRoute>
+                      <VideoUpload />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/dashboard/:organizationId"
+                  element={
+                    <ProtectedRoute>
+                      <OrganizationDashboard />
+                    </ProtectedRoute>
+                  }
+                />
+                
+                {/* Default redirect */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </Routes>
+            </Router>
+          </SocketProvider>
         </AuthProvider>
       </ThemeProvider>
     </GoogleOAuthProvider>
