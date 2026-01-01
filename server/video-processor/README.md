@@ -1,25 +1,10 @@
-# Video Processor
 
-## Requirements
+# Requirements : Google Cloud CLI
+# Submit Image 
+`gcloud builds submit --tag gcr.io/etm-cloud/video-processor`
 
-- Google Cloud CLI
-
-## Setup
-
-### Submit Image
-
-```bash
-gcloud builds submit --tag gcr.io/your-project-id/video-processor
-```
-
-### Create Cloud Run Job
-
-```bash
-gcloud run jobs create video-processor \
+# Create Cloud Run Job
+` gcloud run jobs create video-processor \
   --image gcr.io/etm-cloud/video-processor \
   --region asia-south1 \
-  --project your-project-id
-```
-
-### Set CORS To the bucket
-gsutil cors set cors.json gs://bucket-name
+  --project etm-cloud`

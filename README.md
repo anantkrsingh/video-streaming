@@ -1,196 +1,259 @@
-# Video Streaming Application
+# Video Streaming Platform
 
-A comprehensive full-stack application for video upload, sensitivity processing, and streaming with real-time progress tracking.
+A full-stack video streaming application with video upload, processing, and real-time progress tracking. Built with React, Node.js, and Google Cloud Platform.
+
+## 🏗️ Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         Docker Network                          │
+│                                                                 │
+│  ┌──────────────────────┐      ┌──────────────────────────┐    │
+│  │   Client (nginx)     │      │    Server (Node.js)      │    │
+│  │   Port: 3001         │      │    Port: 3000            │    │
+│  │                      │      │                          │    │
+│  │  ┌────────────────┐  │      │  ┌────────────────────┐  │    │
+│  │  │  React + Vite  │  │ ───► │  │  Express API       │  │    │
+│  │  │  (Static Build)│  │ /api │  │  + Socket.io       │  │    │
+│  │  └────────────────┘  │      │  └────────────────────┘  │    │
+│  │                      │      │           │              │    │
+│  │  nginx reverse proxy │      │           ▼              │    │
+│  │  - /api → server     │      │  ┌────────────────────┐  │    │
+│  │  - /socket.io → ws   │      │  │  MongoDB           │  │    │
+│  └──────────────────────┘      │  │  (External)        │  │    │
+│                                │  └────────────────────┘  │    │
+│                                │           │              │    │
+│                                │           ▼              │    │
+│                                │  ┌────────────────────┐  │    │
+│                                │  │  Google Cloud      │  │    │
+│                                │  │  Storage (GCS)     │  │    │
+│                                │  └────────────────────┘  │    │
+│                                └──────────────────────────┘    │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 ## 🚀 Features
 
-- **User Authentication**: Secure login and registration system with JWT tokens
-- **Role-Based Access Control (RBAC)**: Three user roles (Viewer, Editor, Admin)
-- **Multi-Tenant Architecture**: User data isolation and organization support
-- **Material UI Design**: Modern, responsive user interface
-- **RESTful API**: Clean backend architecture following MVM pattern
+- **Video Upload**: Upload videos with real-time progress tracking
+- **Video Processing**: Automatic video transcoding and HLS streaming
+- **Thumbnail Generation**: Auto-generated thumbnails using FFmpeg
+- **User Authentication**: JWT-based auth with Google OAuth support
+- **Organization Management**: Multi-tenant architecture with role-based access
+- **Real-time Updates**: Socket.io for live progress notifications
+- **Responsive UI**: Material UI design system
 
 ## 📋 Prerequisites
 
-- Node.js (v18 or higher)
-- MongoDB (local installation or MongoDB Atlas)
-- npm or yarn
+- Docker & Docker Compose
+- MongoDB (local or Atlas)
+- Google Cloud Platform account with:
+  - Cloud Storage bucket
+  - Service account with Storage permissions
+  - OAuth 2.0 credentials
 
-## 🛠️ Installation
+## 🐳 Quick Start with Docker
+
+### 1. Clone and Configure
+
+```bash
+# Create .env file in project root
+cat > .env << EOF
+# MongoDB
+MONGODB_URI=mongodb://your-mongodb-host:27017/video-streaming
+
+# JWT Secrets
+JWT_SECRET=your-super-secret-jwt-key
+PROCESSING_JWT_SECRET=your-processing-jwt-secret
+
+# Google Cloud Platform
+GCP_BUCKET_NAME=your-gcs-bucket-name
+GCP_PROJECT_ID=your-gcp-project-id
+GCP_SERVICE_ACCOUNT='{"type":"service_account",...}'  # JSON string of service account
+
+# Google OAuth
+GOOGLE_CLIENT_ID=your-google-oauth-client-id
+
+# Optional
+CLIENT_URL=http://localhost:3001
+EOF
+```
+
+### 2. Build and Run
+
+```bash
+# Build and start all services
+docker-compose up --build
+
+# Or run in detached mode
+docker-compose up -d --build
+```
+
+### 3. Access the Application
+
+| Service        | URL                        | Description           |
+| -------------- | -------------------------- | --------------------- |
+| Frontend       | http://localhost:3001      | React application      |
+| Backend API    | http://localhost:3000/api  | REST API endpoints    |
+| API via Proxy  | http://localhost:3001/api  | Nginx proxied API     |
+
+## 🛠️ Local Development
 
 ### Backend Setup
 
-1. Navigate to the server directory:
 ```bash
 cd server
-```
-
-2. Install dependencies:
-```bash
 npm install
+cp .env.example .env  # Configure environment variables
+npm start             # Starts with nodemon on port 3000
 ```
-
-3. Create a `.env` file in the `server` directory:
-```bash
-cp .env.example .env
-```
-
-4. Update the `.env` file with your configuration:
-```env
-PORT=3000
-NODE_ENV=development
-MONGODB_URI=mongodb://localhost:27017/video-streaming
-JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
-JWT_EXPIRES_IN=7d
-CLIENT_URL=http://localhost:5173
-```
-
-5. Start the backend server:
-```bash
-npm start
-```
-
-The server will run on `http://localhost:3000`
 
 ### Frontend Setup
 
-1. Navigate to the client directory:
 ```bash
 cd client
-```
-
-2. Install dependencies:
-```bash
 npm install
+npm run dev           # Starts Vite dev server on port 5173
 ```
-
-3. Create a `.env` file in the `client` directory:
-```bash
-cp .env.example .env
-```
-
-4. Update the `.env` file:
-```env
-VITE_API_URL=http://localhost:3000/api
-```
-
-5. Start the development server:
-```bash
-npm run dev
-```
-
-The frontend will run on `http://localhost:5173`
 
 ## 📁 Project Structure
 
 ```
 video-streaming/
-├── server/                 # Backend application
-│   ├── models/            # MongoDB models (MVM - Model)
-│   │   └── User.js        # User model with RBAC
-│   ├── controllers/       # Route controllers (MVM - Controller)
-│   │   └── authController.js
-│   ├── routes/            # API routes (MVM - Router)
-│   │   └── authRoutes.js
-│   ├── middleware/        # Express middleware
-│   │   ├── auth.js        # Authentication & authorization
-│   │   └── errorHandler.js
-│   └── index.js           # Server entry point
+├── docker-compose.yaml       # Docker orchestration
+├── .env                      # Environment variables (create this)
 │
-└── client/                # Frontend application
-    └── src/
-        ├── components/    # React components
-        │   ├── Login.tsx
-        │   ├── Register.tsx
-        │   ├── Dashboard.tsx
-        │   └── ProtectedRoute.tsx
-        ├── contexts/      # React contexts
-        │   └── AuthContext.tsx
-        ├── services/      # API services
-        │   ├── api.ts
-        │   └── authService.ts
-        └── App.tsx        # Main app component
+├── client/                   # Frontend (React + TypeScript + Vite)
+│   ├── Dockerfile           # Multi-stage build with nginx
+│   ├── nginx.conf           # Nginx configuration
+│   ├── src/
+│   │   ├── components/      # React components
+│   │   ├── contexts/        # Auth & Socket contexts
+│   │   └── services/        # API services
+│   └── package.json
+│
+├── server/                   # Backend (Node.js + Express)
+│   ├── Dockerfile           # Node.js with FFmpeg
+│   ├── controllers/         # Route handlers
+│   ├── models/              # MongoDB schemas
+│   ├── routes/              # API routes
+│   ├── middleware/          # Auth & error handling
+│   ├── workers/             # Background processors
+│   └── package.json
+│
+└── server/video-processor/   # Cloud Run processor (optional)
+    ├── Dockerfile
+    └── process.js
 ```
 
-## 🔐 Authentication API Endpoints
+## 🔌 API Endpoints
 
-### Register User
-```http
-POST /api/auth/register
-Content-Type: application/json
+### Authentication
 
-{
-  "name": "John Doe",
-  "email": "john@example.com",
-  "password": "password123",
-  "role": "viewer"  // optional: viewer, editor, admin
-}
-```
+| Method | Endpoint              | Description              |
+| ------ | --------------------- | ------------------------ |
+| POST   | `/api/auth/register`  | Register new user        |
+| POST   | `/api/auth/login`     | Login with email/password|
+| POST   | `/api/auth/google`    | Login with Google OAuth  |
+| GET    | `/api/auth/me`        | Get current user         |
 
-### Login
-```http
-POST /api/auth/login
-Content-Type: application/json
+### Videos
 
-{
-  "email": "john@example.com",
-  "password": "password123"
-}
-```
+| Method | Endpoint                  | Description      |
+| ------ | ------------------------- | ---------------- |
+| GET    | `/api/videos`             | List all videos  |
+| POST   | `/api/videos/upload`      | Upload a video   |
+| GET    | `/api/videos/:id`         | Get video details|
+| GET    | `/api/videos/:id/stream`  | Stream video     |
 
-### Get Current User
-```http
-GET /api/auth/me
-Authorization: Bearer <token>
-```
+### Organizations
 
-### Verify Token
-```http
-GET /api/auth/verify
-Authorization: Bearer <token>
-```
+| Method | Endpoint                              | Description           |
+| ------ | ------------------------------------- | --------------------- |
+| POST   | `/api/organizations`                  | Create organization   |
+| GET    | `/api/organizations/:id`              | Get organization      |
+| POST   | `/api/organizations/:id/members`       | Add member            |
 
 ## 👥 User Roles
 
-- **Viewer**: Read-only access to assigned videos
-- **Editor**: Upload, edit, and manage video content
-- **Admin**: Full system access including user management
+| Role     | Permissions                              |
+| -------- | ---------------------------------------- |
+| **Viewer** | Watch videos, view content               |
+| **Editor** | Upload, edit, manage videos              |
+| **Admin**  | Full access + user management            |
+| **Owner**  | Organization owner, all permissions      |
 
 ## 🔒 Security Features
 
 - Password hashing with bcryptjs
-- JWT token-based authentication
-- Protected routes with authentication middleware
+- JWT token authentication
+- Google OAuth 2.0 integration
 - Role-based access control (RBAC)
-- Input validation with express-validator
+- Organization-level permissions
+- Input validation
 - CORS configuration
-- Error handling middleware
+- Secure file upload handling
 
-## 🎨 UI Components
+## 🐳 Docker Services
 
-- **Login Page**: User authentication interface
-- **Register Page**: New user registration with role selection
-- **Dashboard**: Main dashboard after login with user info
-- **Protected Routes**: Automatic redirect to login for unauthenticated users
+### Server Container
 
-## 📝 Notes
+- **Base**: Node.js 20 Alpine
+- **Includes**: FFmpeg for thumbnail generation
+- **Port**: 3000 (internal & external)
+- **Health Check**: HTTP GET on `/`
 
-- Passwords are automatically hashed before storage
-- JWT tokens expire after 7 days (configurable)
-- All API endpoints require authentication except `/api/auth/register` and `/api/auth/login`
-- User data is isolated by organization ID for multi-tenant support
+### Client Container
 
-## 🚧 Next Steps
+- **Build Stage**: Node.js 20 Alpine (builds React app)
+- **Production Stage**: Nginx Alpine (serves static files)
+- **Port**: 3001
+- **Features**:
+  - Reverse proxy to backend (`/api`, `/socket.io`)
+  - Gzip compression
+  - SPA routing support
+  - 500MB upload limit
 
-The following features are planned for future implementation:
-- Video upload functionality
-- Video processing pipeline
-- Real-time progress updates with Socket.io
-- Video streaming with range requests
-- Video library and management
-- Content sensitivity analysis
+## 📝 Environment Variables
+
+| Variable                  | Description                        | Required |
+| ------------------------- | ---------------------------------- | -------- |
+| `MONGODB_URI`             | MongoDB connection string          | Yes      |
+| `JWT_SECRET`              | JWT signing secret                 | Yes      |
+| `PROCESSING_JWT_SECRET`   | Processing token secret            | Yes      |
+| `GCP_BUCKET_NAME`         | GCS bucket name                    | Yes      |
+| `GCP_PROJECT_ID`          | GCP project ID                     | Yes      |
+| `GCP_SERVICE_ACCOUNT`     | Service account JSON string        | Yes      |
+| `GOOGLE_CLIENT_ID`        | Google OAuth client ID             | Yes      |
+| `CLIENT_URL`              | Frontend URL for CORS              | No       |
+
+> **Note**: `CLIENT_URL` defaults to `http://localhost:3001` if not provided.
+
+## 🚧 Troubleshooting
+
+### Container won't start
+
+```bash
+# Check logs
+docker-compose logs server
+docker-compose logs client
+
+# Rebuild from scratch
+docker-compose down -v
+docker-compose up --build
+```
+
+### API connection issues
+
+- Ensure MongoDB is accessible from Docker network
+- Check `MONGODB_URI` uses correct hostname (not `localhost` if external)
+- Verify GCP credentials are valid
+
+### Upload failures
+
+- Check GCS bucket permissions
+- Verify service account has Storage Object Admin role
+- Check nginx `client_max_body_size` (default: 500MB)
 
 ## 📄 License
 
 MIT
-
