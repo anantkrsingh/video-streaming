@@ -14,7 +14,6 @@ import {
 import { CloudUpload, Close } from '@mui/icons-material';
 import { useSocket } from '../contexts/SocketContext';
 import { uploadVideo } from '../services/videoService';
-import { useNavigate } from 'react-router-dom';
 
 interface VideoUploadProps {
   organizationId?: string;
@@ -35,25 +34,18 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
   const [gcsProgress, setGcsProgress] = useState(0); // Server -> Cloud progress
   const [processingProgress, setProcessingProgress] = useState(0); // Video processing progress
   const [status, setStatus] = useState<string>('');
-  const [statusMessage, setStatusMessage] = useState<string>('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(null);
 
   const { socket } = useSocket();
-  const navigate = useNavigate();
 
-  // Combined progress: 
-  // HTTP upload (0-30%) + GCS upload (30-50%) + Video processing (50-100%)
-  const totalProgress = status === 'Uploading to server' 
-    ? Math.round(httpProgress * 0.3) 
+  // Combined upload progress: HTTP upload (0-50%) + GCS upload (50-100%)
+  const uploadProgress = status === 'Uploading to server' 
+    ? Math.round(httpProgress * 0.5) 
     : status === 'Uploading' 
-      ? 30 + Math.round(gcsProgress * 0.2)
-      : status === 'Processing'
-        ? 50 + Math.round(processingProgress * 0.5)
-        : status === 'Uploaded'
-          ? 100
-          : 0;
+      ? 50 + Math.round(gcsProgress * 0.5)
+      : 100;
 
   // Listen for upload progress updates from server (GCS upload)
   useEffect(() => {
@@ -64,19 +56,20 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
     console.log('Joined room for video:', videoId);
 
     socket.on('upload-progress', (data: { videoId: string; progress: number; status: string }) => {
-      if (data.videoId === videoId) {
+      if (String(data.videoId) === String(videoId)) {
         console.log('GCS upload progress:', data.progress);
         setGcsProgress(data.progress);
-        setStatus('Uploading');
-        setStatusMessage(`Uploading to cloud: ${data.progress}%`);
+        // Don't reset status if progress is 100% (let upload-complete handle the transition)
+        if (data.progress < 100) {
+          setStatus('Uploading');
+        }
       }
     });
 
     socket.on('upload-complete', (data: { videoId: string; status: string }) => {
-      if (data.videoId === videoId) {
+      if (String(data.videoId) === String(videoId)) {
         console.log('Upload complete, starting processing...');
         setStatus('Processing');
-        setStatusMessage('Starting video processing...');
         setGcsProgress(100);
         setProcessingProgress(0);
       }
@@ -84,31 +77,25 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
 
     // Listen for video processing progress from Cloud Run container
     socket.on('processing-progress', (data: { videoId: string; progress: number; stage: string }) => {
-      if (data.videoId === videoId) {
+      if (String(data.videoId) === String(videoId)) {
         console.log('Processing progress:', data.progress, '- Stage:', data.stage);
-        setProcessingProgress(data.progress);
-        setStatusMessage(`${data.stage}: ${data.progress}%`);
+        setProcessingProgress(Math.max(data.progress, processingProgress));
+        // Also ensure status is set to Processing (fallback if upload-complete was missed)
+        setStatus('Processing');
       }
     });
 
     socket.on('processing-complete', (data: { videoId: string; status: string }) => {
-      if (data.videoId === videoId) {
+      if (String(data.videoId) === String(videoId)) {
         console.log('Processing complete');
         setStatus('Uploaded');
         setProcessingProgress(100);
-        setStatusMessage('Video ready!');
-        setTimeout(() => {
-          if (organizationId) {
-            navigate(`/dashboard/${organizationId}`);
-          } else {
-            navigate('/');
-          }
-        }, 2000);
+        setLoading(false);
       }
     });
 
     socket.on('processing-failed', (data: { videoId: string; error: string }) => {
-      if (data.videoId === videoId) {
+      if (String(data.videoId) === String(videoId)) {
         console.log('Processing failed:', data.error);
         setError(`Processing failed: ${data.error}`);
         setLoading(false);
@@ -117,7 +104,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
     });
 
     socket.on('upload-error', (data: { videoId: string; error: string }) => {
-      if (data.videoId === videoId) {
+      if (String(data.videoId) === String(videoId)) {
         setError(data.error);
         setLoading(false);
         setStatus('');
@@ -125,7 +112,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
     });
 
     socket.on('thumbnail-generated', (data: { videoId: string; thumbnailUrl: string }) => {
-      if (data.videoId === videoId) {
+      if (String(data.videoId) === String(videoId)) {
         console.log('Thumbnail generated:', data.thumbnailUrl);
       }
     });
@@ -140,7 +127,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
       socket.off('upload-error');
       socket.off('thumbnail-generated');
     };
-  }, [socket, videoId, navigate, organizationId]);
+  }, [socket, videoId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -172,7 +159,6 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
     setHttpProgress(0);
     setGcsProgress(0);
     setStatus('Uploading to server');
-    setStatusMessage('Uploading to server: 0%');
 
     if (!title.trim()) {
       setError('Title is required');
@@ -199,13 +185,11 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
       // Upload with HTTP progress tracking
       const response = await uploadVideo(formData, (progress) => {
         setHttpProgress(progress);
-        setStatusMessage(`Uploading to server: ${progress}%`);
       });
 
       // Got videoId, now socket will receive GCS progress
       setVideoId(response.data.video.id);
       setStatus('Uploading');
-      setStatusMessage('Preparing cloud upload...');
       
     } catch (err: any) {
       setError(err.response?.data?.message || 'Upload failed. Please try again.');
@@ -318,7 +302,6 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
                     setGcsProgress(0);
                     setProcessingProgress(0);
                     setStatus('');
-                    setStatusMessage('');
                     setVideoId(null);
                   }}
                   disabled={loading || status === 'Processing' || status === 'Uploaded'}
@@ -329,26 +312,37 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
             )}
           </Box>
 
-          {/* Progress Section */}
-          {(status === 'Uploading to server' || status === 'Uploading' || status === 'Processing') && (
+          {/* Upload Progress */}
+          {(status === 'Uploading to server' || status === 'Uploading') && (
             <Box sx={{ mt: 2, mb: 2 }}>
               <Typography variant="body2" gutterBottom sx={{ fontWeight: 'medium' }}>
-                {statusMessage}
+                Uploading {uploadProgress}%
               </Typography>
               <LinearProgress 
                 variant="determinate" 
-                value={totalProgress} 
+                value={uploadProgress} 
                 sx={{ height: 10, borderRadius: 5 }}
               />
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
-                Overall progress: {totalProgress}%
+            </Box>
+          )}
+
+          {/* Processing Progress */}
+          {status === 'Processing' && (
+            <Box sx={{ mt: 2, mb: 2 }}>
+              <Typography variant="body2" gutterBottom sx={{ fontWeight: 'medium' }}>
+                Processing {processingProgress}%
               </Typography>
+              <LinearProgress 
+                variant="determinate" 
+                value={processingProgress} 
+                sx={{ height: 10, borderRadius: 5 }}
+              />
             </Box>
           )}
 
           {status === 'Uploaded' && (
             <Alert severity="success" sx={{ mt: 2 }}>
-              Video uploaded successfully! Redirecting...
+              Upload Complete
             </Alert>
           )}
 

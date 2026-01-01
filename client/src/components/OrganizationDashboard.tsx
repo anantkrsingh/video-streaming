@@ -6,10 +6,8 @@ import {
   Tabs,
   Tab,
   Paper,
-  Button,
   AppBar,
   Toolbar,
-  Avatar,
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getOrganization } from '../services/organizationService';
@@ -18,7 +16,6 @@ import VideoList from './VideoList';
 import VideoUpload from './VideoUpload';
 import AccessManagement from './AccessManagement';
 import AvatarMenu from './AvatarMenu';
-import { useAuth } from '../contexts/AuthContext';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -52,7 +49,6 @@ const OrganizationDashboard: React.FC = () => {
   const [organization, setOrganization] = useState<OrganizationDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const { user } = useAuth();
 
   useEffect(() => {
     if (organizationId) {

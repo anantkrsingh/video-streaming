@@ -14,6 +14,29 @@ const storage = new Storage({
 const bucket = storage.bucket(process.env.GCP_BUCKET_NAME);
 
 /**
+ * Sanitize filename by removing spaces and special characters
+ * @param {string} filename - Original filename
+ * @returns {string} Sanitized filename
+ */
+const sanitizeFileName = (filename) => {
+  // Get file extension
+  const ext = path.extname(filename);
+  const nameWithoutExt = path.basename(filename, ext);
+  
+  // Replace spaces with underscores, remove special characters (keep alphanumeric, dash, underscore)
+  const sanitized = nameWithoutExt
+    .replace(/\s+/g, '_')           // Replace spaces with underscores
+    .replace(/[^a-zA-Z0-9_-]/g, '') // Remove special characters
+    .replace(/_+/g, '_')            // Replace multiple underscores with single
+    .replace(/^_|_$/g, '');         // Remove leading/trailing underscores
+  
+  // Ensure filename is not empty after sanitization
+  const finalName = sanitized || 'video';
+  
+  return `${finalName}${ext.toLowerCase()}`;
+};
+
+/**
  * Upload Video Controller
  * Handles video upload with real-time progress tracking via Socket.io
  * @route POST /api/videos/upload
@@ -75,11 +98,11 @@ const uploadVideo = async (req, res, next) => {
     // Parse tags
     const tagsArray = tags ? (Array.isArray(tags) ? tags : tags.split(",").map((t) => t.trim())) : [];
 
-    // Generate unique filename
+    // Generate unique filename with sanitization
     const timestamp = Date.now();
     const originalName = req.file.originalname;
-    const fileExtension = path.extname(originalName);
-    const gcsFileName = `${timestamp}-${path.basename(originalName, fileExtension)}${fileExtension}`;
+    const sanitizedName = sanitizeFileName(originalName);
+    const gcsFileName = `${timestamp}-${sanitizedName}`;
 
     // Create video document in database with status "Uploading"
     const video = await Video.create({

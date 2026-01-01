@@ -20,3 +20,6 @@ gcloud run jobs create video-processor \
   --region asia-south1 \
   --project your-project-id
 ```
+
+### Set CORS To the bucket
+gsutil cors set cors.json gs://bucket-name

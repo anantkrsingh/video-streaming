@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Backend API Server
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    container_name: video-streaming-server
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - MONGODB_URI=${MONGODB_URI}
+      - JWT_SECRET=${JWT_SECRET}
+      - PROCESSING_JWT_SECRET=${PROCESSING_JWT_SECRET}
+      - GCP_CREDENTIALS=/app/service-account.json
+      - GCP_BUCKET_NAME=${GCP_BUCKET_NAME}
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - CLIENT_URL=${CLIENT_URL:-http://localhost}
+    volumes:
+      - ./server/service-account.json:/app/service-account.json:ro
+      - server-temp:/app/temp
+    networks:
+      - video-streaming-network
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # Frontend Client
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+      args:
+        - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+    container_name: video-streaming-client
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      server:
+        condition: service_healthy
+    networks:
+      - video-streaming-network
+
+networks:
+  video-streaming-network:
+    driver: bridge
+
+volumes:
+  server-temp:
+    driver: local
+

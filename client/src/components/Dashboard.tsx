@@ -68,7 +68,7 @@ const Dashboard: React.FC = () => {
                 {user?.email}
               </Typography>
               <Typography variant="body2" color="primary">
-                Role: {user?.role?.charAt(0).toUpperCase() + user?.role?.slice(1)}
+                Role: {user?.role?.charAt(0).toUpperCase() + (user?.role?.slice(1) || '')}
               </Typography>
             </Box>
           </Box>

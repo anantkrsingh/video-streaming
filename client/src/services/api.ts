@@ -6,9 +6,24 @@ import axios from 'axios';
  * Includes request/response interceptors for authentication
  */
 
+// Determine API base URL
+// In production (Docker), use relative path since nginx proxies /api to backend
+// In development, use the full URL from environment or default to localhost:3000
+const getBaseURL = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
+  // In production, use relative path (nginx handles proxy)
+  if (import.meta.env.PROD) {
+    return '/api';
+  }
+  // In development, use localhost
+  return 'http://localhost:3000/api';
+};
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api',
+  baseURL: getBaseURL(),
   headers: {
     'Content-Type': 'application/json',
   },

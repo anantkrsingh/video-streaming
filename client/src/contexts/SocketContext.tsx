@@ -23,7 +23,24 @@ export const SocketProvider: React.FC<SocketProviderProps> = ({ children }) => {
 
   useEffect(() => {
     // Initialize Socket.io connection
-    const socketUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3000';
+    // In production (Docker), connect to same origin (nginx proxies /socket.io to backend)
+    // In development, connect to localhost:3000
+    const getSocketUrl = () => {
+      if (import.meta.env.VITE_SOCKET_URL) {
+        return import.meta.env.VITE_SOCKET_URL;
+      }
+      if (import.meta.env.VITE_API_URL) {
+        return import.meta.env.VITE_API_URL.replace('/api', '');
+      }
+      // In production, use same origin (nginx handles proxy)
+      if (import.meta.env.PROD) {
+        return window.location.origin;
+      }
+      // In development, use localhost
+      return 'http://localhost:3000';
+    };
+
+    const socketUrl = getSocketUrl();
     const newSocket = io(socketUrl, {
       transports: ['websocket', 'polling'],
     });

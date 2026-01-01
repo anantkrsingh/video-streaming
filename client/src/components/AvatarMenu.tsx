@@ -12,15 +12,12 @@ import {
   DialogActions,
   TextField,
   Button,
-  Box,
-  Typography,
   CircularProgress,
 } from '@mui/material';
 import {
   Business,
   Add,
   Logout,
-  Settings,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
