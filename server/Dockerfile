@@ -17,9 +17,10 @@ COPY . .
 
 # Create temp directory for uploads
 RUN mkdir -p temp
+RUN mkdir -p /app
 
 # Expose port
 EXPOSE 3000
 
 # Start the server (use node instead of nodemon for production)
-CMD ["node", "index.js"]
+CMD ["/bin/sh", "-c", "echo \"$GCP_SERVICE_ACCOUNT\" > /app/service-account.json && npm start"]
