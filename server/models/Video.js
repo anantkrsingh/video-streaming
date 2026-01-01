@@ -35,10 +35,16 @@ const videoSchema = new mongoose.Schema(
       required: [true, "Raw file name is required"],
     },
 
+    // GCS file name (stored in cloud)
+    gcsFileName: {
+      type: String,
+      default: null,
+    },
+
     // Video processing status
     status: {
       type: String,
-      enum: ["Uploading", "Processing", "Flagged", "Uploaded", "Deleted"],
+      enum: ["Uploading", "Processing", "Flagged", "Uploaded", "Deleted", "Failed"],
       default: "Uploading",
       index: true, // Indexed for efficient queries
     },
@@ -58,6 +64,12 @@ const videoSchema = new mongoose.Schema(
 
     // Processed video URL (HLS or streaming URL)
     videoUrl: {
+      type: String,
+      default: null,
+    },
+
+    // HLS playlist URL (for adaptive streaming)
+    hlsUrl: {
       type: String,
       default: null,
     },
@@ -118,6 +130,25 @@ const videoSchema = new mongoose.Schema(
       default: 0,
       min: 0,
       max: 100,
+    },
+
+    // Current processing stage (e.g., "Downloading", "Converting", "Uploading")
+    processingStage: {
+      type: String,
+      default: null,
+    },
+
+    // Processing JWT token (for Cloud Run container authentication)
+    processingToken: {
+      type: String,
+      default: null,
+      select: false, // Don't include in queries by default for security
+    },
+
+    // Error message if processing failed
+    errorMessage: {
+      type: String,
+      default: null,
     },
 
     // User who uploaded the video (reference to User model)

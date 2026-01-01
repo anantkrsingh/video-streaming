@@ -8,8 +8,8 @@ const { validationResult } = require("express-validator");
 
 /**
  * Get all videos with optional search and filtering
- * @route GET /api/videos
- * @access Private
+ * @route GET /api/videos (private) or GET /api/videos/public (public)
+ * @access Private or Public
  */
 const getAllVideos = async (req, res, next) => {
   try {
@@ -19,30 +19,36 @@ const getAllVideos = async (req, res, next) => {
     // Build query
     const query = {};
 
-    // Multi-tenant: Filter by organization
-    // If organizationId is provided in query, use it (for organization dashboard)
-    // Otherwise, use user's organizationId
-    const organizationId = req.query.organizationId || req.user.organizationId;
-    if (organizationId) {
-      query.organizationId = organizationId;
-    } else if (req.user.role !== "admin") {
-      // Non-admin users without organizationId see nothing
-      query.organizationId = null;
-    }
+    // Check if this is a public route (no authenticated user)
+    const isPublicRoute = !req.user;
 
-    // Filter by status if provided
-    if (status && status !== "all") {
-      query.status = status;
+    if (isPublicRoute) {
+      // Public route: Only show "Uploaded" videos from all organizations
+      query.status = "Uploaded";
+    } else {
+      // Private route: Filter by organization
+      // If organizationId is provided in query, use it (for organization dashboard)
+      // Otherwise, use user's organizationId
+      const organizationId = req.query.organizationId || req.user.organizationId;
+      if (organizationId) {
+        query.organizationId = organizationId;
+      } else if (req.user.role !== "admin") {
+        // Non-admin users without organizationId see nothing
+        query.organizationId = null;
+      }
+
+      // Filter by status if provided
+      if (status && status !== "all") {
+        query.status = status;
+      } else {
+        // Exclude deleted and failed videos by default
+        query.status = { $nin: ["Deleted", "Failed"] };
+      }
     }
 
     // Text search in title, description, and tags
     if (search && search.trim()) {
       query.$text = { $search: search.trim() };
-    }
-
-    // Exclude deleted videos unless specifically requested
-    if (status !== "Deleted") {
-      query.status = { ...query.status, $ne: "Deleted" };
     }
 
     // Execute query with pagination
@@ -75,8 +81,8 @@ const getAllVideos = async (req, res, next) => {
 
 /**
  * Get single video by ID
- * @route GET /api/videos/:id
- * @access Private
+ * @route GET /api/videos/:id (private) or GET /api/videos/public/:id (public)
+ * @access Private or Public
  */
 const getVideoById = async (req, res, next) => {
   try {
@@ -84,9 +90,17 @@ const getVideoById = async (req, res, next) => {
 
     const query = { _id: id };
 
-    // Multi-tenant: Filter by organization (admin can see all)
-    if (req.user.role !== "admin") {
-      query.organizationId = req.user.organizationId;
+    // Check if this is a public route (no authenticated user)
+    const isPublicRoute = !req.user;
+
+    if (isPublicRoute) {
+      // Public route: Only show "Uploaded" videos
+      query.status = "Uploaded";
+    } else {
+      // Multi-tenant: Filter by organization (admin can see all)
+      if (req.user.role !== "admin") {
+        query.organizationId = req.user.organizationId;
+      }
     }
 
     const video = await Video.findOne(query)

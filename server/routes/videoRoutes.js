@@ -50,12 +50,27 @@ const thumbnailUpload = multer({
  */
 
 /**
+ * @route   GET /api/videos/public
+ * @desc    Get all public videos (status: Uploaded) - No auth required
+ * @access  Public
+ * @query   search, page, limit
+ */
+router.get("/public", getAllVideos);
+
+/**
  * @route   GET /api/videos
  * @desc    Get all videos with search and filtering
  * @access  Private
  * @query   search, status, page, limit
  */
 router.get("/", authenticate, getAllVideos);
+
+/**
+ * @route   GET /api/videos/public/:id
+ * @desc    Get single public video by ID (status: Uploaded) - No auth required
+ * @access  Public
+ */
+router.get("/public/:id", getVideoById);
 
 /**
  * @route   GET /api/videos/:id

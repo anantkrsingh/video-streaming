@@ -10,6 +10,7 @@ require("./workers/video-processor");
 const authRoutes = require("./routes/authRoutes");
 const videoRoutes = require("./routes/videoRoutes");
 const organizationRoutes = require("./routes/organizationRoutes");
+const processingRoutes = require("./routes/processingRoutes");
 // Import error handling middleware
 const { errorHandler, notFound } = require("./middleware/errorHandler");
 
@@ -93,6 +94,9 @@ app.use("/api/organizations", organizationRoutes);
 
 // Video routes
 app.use("/api/videos", videoRoutes);
+
+// Processing routes (for Cloud Run container callbacks)
+app.use("/api/processing", processingRoutes);
 
 /**
  * Error Handling

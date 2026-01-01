@@ -46,11 +46,10 @@ const userSchema = new mongoose.Schema(
     },
 
     // Google OAuth ID (for users who sign in with Google)
+    // Index is defined separately with sparse: true to allow multiple null/undefined values
     googleId: {
       type: String,
-      unique: true,
-      sparse: true, // Allows multiple null values
-      default: null,
+      // Note: Don't set default: null - let it be undefined for sparse unique to work
     },
 
     // User role for RBAC (Role-Based Access Control)
@@ -123,6 +122,10 @@ userSchema.methods.toJSON = function () {
   delete userObject.password; // Never send password to client
   return userObject;
 };
+
+// Explicitly define the sparse unique index for googleId
+// sparse: true allows multiple documents to have undefined/missing googleId
+userSchema.index({ googleId: 1 }, { unique: true, sparse: true });
 
 // Create and export User model
 const User = mongoose.model("User", userSchema);

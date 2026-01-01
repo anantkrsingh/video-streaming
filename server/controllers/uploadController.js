@@ -1,6 +1,7 @@
 const { Storage } = require("@google-cloud/storage");
 const Video = require("../models/Video");
 const Organization = require("../models/Organization");
+const { generateProcessingToken } = require("./processingController");
 const path = require("path");
 const fs = require("fs");
 const { promisify } = require("util");
@@ -208,12 +209,17 @@ const uploadToGCS = async (videoId, gcsFileName, filePath, mimeType, fileSize, i
             // Get public URL
             const publicUrl = `https://storage.googleapis.com/${process.env.GCP_BUCKET_NAME}/${gcsFileName}`;
 
-            // Update video document
+            // Generate processing token for Cloud Run container (valid 20 min)
+            const processingToken = generateProcessingToken(videoId, gcsFileName);
+
+            // Update video document with GCS filename and processing token
             await Video.findByIdAndUpdate(videoId, {
               rawView: publicUrl,
               uploadProgress: 100,
               status: "Processing",
               processingProgress: 0,
+              gcsFileName: gcsFileName, // Store GCS filename for worker matching
+              processingToken: processingToken, // Store token for Cloud Run container
             });
 
             // Emit upload complete
@@ -240,21 +246,9 @@ const uploadToGCS = async (videoId, gcsFileName, filePath, mimeType, fileSize, i
               fs.unlinkSync(filePath);
             }
 
-            // Start video processing
-            // For now, we'll just update status to "Uploaded" after a delay
-            setTimeout(async () => {
-              await Video.findByIdAndUpdate(videoId, {
-                status: "Uploaded",
-                processingProgress: 100,
-              });
-
-              if (io) {
-                io.to(roomId).emit("processing-complete", {
-                  videoId,
-                  status: "Uploaded",
-                });
-              }
-            }, 2000); // Simulate processing delay
+            // Note: Video processing is now handled by Cloud Run container
+            // The container will call /api/processing/:videoId/complete when done
+            console.log(`Video ${videoId} ready for processing. GCS file: ${gcsFileName}`);
 
             resolve();
           } catch (error) {
