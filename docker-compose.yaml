@@ -23,7 +23,6 @@ services:
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - CLIENT_URL=${CLIENT_URL:-http://localhost:3001}
     volumes:
-      - ./server/service-account.json:/app/service-account.json:ro
       - server-temp:/app/temp
     networks:
       - video-streaming-network
