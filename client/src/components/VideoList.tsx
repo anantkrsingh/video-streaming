@@ -57,9 +57,9 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
   const fetchVideos = async () => {
     try {
       setLoading(true);
-      // Public view only shows "Uploaded" videos
+      // Public view uses public API endpoint and shows only "Uploaded" videos
       const statusFilter = isPublic ? 'Uploaded' : undefined;
-      const response = await getAllVideos(searchQuery, statusFilter, page, 12, organizationId);
+      const response = await getAllVideos(searchQuery, statusFilter, page, 12, organizationId, isPublic);
       setVideos(response.data.videos);
       setTotalPages(response.data.pagination.pages);
     } catch (error) {
@@ -144,7 +144,24 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
             <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
               Video Streaming
             </Typography>
-            <AvatarMenu />
+            {/* Show login/register buttons for unauthenticated users, AvatarMenu for authenticated */}
+            {user ? (
+              <AvatarMenu />
+            ) : (
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button color="inherit" onClick={() => navigate('/login')}>
+                  Login
+                </Button>
+                <Button 
+                  color="inherit" 
+                  variant="outlined" 
+                  onClick={() => navigate('/register')}
+                  sx={{ borderColor: 'white', '&:hover': { borderColor: 'white', bgcolor: 'rgba(255,255,255,0.1)' } }}
+                >
+                  Register
+                </Button>
+              </Box>
+            )}
           </Toolbar>
         </AppBar>
       )}
@@ -196,7 +213,20 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
           <Grid container spacing={3}>
             {videos.map((video) => (
               <Grid item xs={12} sm={6} md={4} lg={3} key={video._id}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                <Card 
+                  sx={{ 
+                    height: '100%', 
+                    display: 'flex', 
+                    flexDirection: 'column',
+                    cursor: 'pointer',
+                    transition: 'transform 0.2s, box-shadow 0.2s',
+                    '&:hover': {
+                      transform: 'translateY(-4px)',
+                      boxShadow: 6,
+                    },
+                  }}
+                  onClick={() => navigate(`/video/${video._id}`)}
+                >
                   <Box sx={{ position: 'relative' }}>
                     <CardMedia
                       component="div"
@@ -222,6 +252,27 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
                       ) : (
                         <PlayArrow sx={{ fontSize: 60, color: 'grey.500' }} />
                       )}
+                      {/* Play overlay on hover */}
+                      <Box
+                        sx={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          bgcolor: 'rgba(0, 0, 0, 0.3)',
+                          opacity: 0,
+                          transition: 'opacity 0.2s',
+                          '&:hover': {
+                            opacity: 1,
+                          },
+                        }}
+                      >
+                        <PlayArrow sx={{ fontSize: 60, color: 'white' }} />
+                      </Box>
                       {/* Hide status chip on public view since all are "Uploaded" */}
                       {!isPublic && (
                         <Chip
@@ -245,7 +296,10 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
                             backgroundColor: 'rgba(255, 255, 255, 0.8)',
                           }}
                           size="small"
-                          onClick={(e) => handleMenuOpen(e, video)}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent card click
+                            handleMenuOpen(e, video);
+                          }}
                         >
                           <MoreVert />
                         </IconButton>
@@ -263,7 +317,7 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
                     {!isPublic && video.tags.length > 0 && (
                       <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {video.tags.slice(0, 3).map((tag) => (
-                          <Chip key={tag} label={tag} size="small" />
+                          <Chip key={tag} label={tag} size="small" onClick={(e) => e.stopPropagation()} />
                         ))}
                       </Box>
                     )}

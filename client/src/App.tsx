@@ -8,6 +8,7 @@ import Register from './components/Register';
 import Dashboard from './components/Dashboard';
 import VideoList from './components/VideoList';
 import VideoUpload from './components/VideoUpload';
+import VideoPlayer from './components/VideoPlayer';
 import OrganizationDashboard from './components/OrganizationDashboard';
 import ProtectedRoute from './components/ProtectedRoute';
 import './App.css';
@@ -67,13 +68,10 @@ function App() {
                     </ProtectedRoute>
                   }
                 />
+                {/* Public Route - Video listing */}
                 <Route
                   path="/"
-                  element={
-                    <ProtectedRoute>
-                      <VideoList isPublic={true} />
-                    </ProtectedRoute>
-                  }
+                  element={<VideoList isPublic={true} />}
                 />
                 <Route
                   path="/upload"
@@ -90,6 +88,11 @@ function App() {
                       <OrganizationDashboard />
                     </ProtectedRoute>
                   }
+                />
+                {/* Public Route - Video player */}
+                <Route
+                  path="/video/:id"
+                  element={<VideoPlayer />}
                 />
                 
                 {/* Default redirect */}

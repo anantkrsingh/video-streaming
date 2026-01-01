@@ -11,10 +11,11 @@ export interface Video {
   description: string;
   tags: string[];
   rawFileName: string;
-  status: 'Uploading' | 'Processing' | 'Flagged' | 'Uploaded' | 'Deleted';
+  status: 'Uploading' | 'Processing' | 'Flagged' | 'Uploaded' | 'Deleted' | 'Failed';
   flagReason?: 'Spam' | 'Nudity' | 'Violence' | 'Copyright' | 'Other';
   rawView?: string;
   videoUrl?: string;
+  hlsUrl?: string;
   thumbnailUrl?: string;
   metadata?: {
     duration?: number;
@@ -31,6 +32,8 @@ export interface Video {
   };
   uploadProgress: number;
   processingProgress: number;
+  processingStage?: string;
+  errorMessage?: string;
   uploadedBy: {
     _id: string;
     name: string;
@@ -79,13 +82,15 @@ export interface UploadResponse {
 
 /**
  * Get all videos with search and filtering
+ * Uses public endpoint when isPublic is true (no auth required)
  */
 export const getAllVideos = async (
   search?: string,
   status?: string,
   page: number = 1,
   limit: number = 10,
-  organizationId?: string
+  organizationId?: string,
+  isPublic: boolean = false
 ): Promise<VideoListResponse> => {
   const params = new URLSearchParams();
   if (search) params.append('search', search);
@@ -94,15 +99,19 @@ export const getAllVideos = async (
   params.append('page', page.toString());
   params.append('limit', limit.toString());
 
-  const response = await api.get<VideoListResponse>(`/videos?${params.toString()}`);
+  // Use public endpoint for unauthenticated access
+  const endpoint = isPublic ? '/videos/public' : '/videos';
+  const response = await api.get<VideoListResponse>(`${endpoint}?${params.toString()}`);
   return response.data;
 };
 
 /**
  * Get single video by ID
+ * Uses public endpoint when isPublic is true (no auth required)
  */
-export const getVideoById = async (id: string): Promise<VideoResponse> => {
-  const response = await api.get<VideoResponse>(`/videos/${id}`);
+export const getVideoById = async (id: string, isPublic: boolean = false): Promise<VideoResponse> => {
+  const endpoint = isPublic ? `/videos/public/${id}` : `/videos/${id}`;
+  const response = await api.get<VideoResponse>(endpoint);
   return response.data;
 };
 

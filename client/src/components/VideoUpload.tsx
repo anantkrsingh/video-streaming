@@ -33,6 +33,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [httpProgress, setHttpProgress] = useState(0); // Client -> Server progress
   const [gcsProgress, setGcsProgress] = useState(0); // Server -> Cloud progress
+  const [processingProgress, setProcessingProgress] = useState(0); // Video processing progress
   const [status, setStatus] = useState<string>('');
   const [statusMessage, setStatusMessage] = useState<string>('');
   const [error, setError] = useState('');
@@ -42,14 +43,17 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
   const { socket } = useSocket();
   const navigate = useNavigate();
 
-  // Combined progress: HTTP upload (0-50%) + GCS upload (50-100%)
+  // Combined progress: 
+  // HTTP upload (0-30%) + GCS upload (30-50%) + Video processing (50-100%)
   const totalProgress = status === 'Uploading to server' 
-    ? Math.round(httpProgress * 0.5) 
+    ? Math.round(httpProgress * 0.3) 
     : status === 'Uploading' 
-      ? 50 + Math.round(gcsProgress * 0.5)
-      : status === 'Processing' || status === 'Uploaded'
-        ? 100
-        : 0;
+      ? 30 + Math.round(gcsProgress * 0.2)
+      : status === 'Processing'
+        ? 50 + Math.round(processingProgress * 0.5)
+        : status === 'Uploaded'
+          ? 100
+          : 0;
 
   // Listen for upload progress updates from server (GCS upload)
   useEffect(() => {
@@ -70,10 +74,20 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
 
     socket.on('upload-complete', (data: { videoId: string; status: string }) => {
       if (data.videoId === videoId) {
-        console.log('Upload complete');
+        console.log('Upload complete, starting processing...');
         setStatus('Processing');
-        setStatusMessage('Processing video...');
+        setStatusMessage('Starting video processing...');
         setGcsProgress(100);
+        setProcessingProgress(0);
+      }
+    });
+
+    // Listen for video processing progress from Cloud Run container
+    socket.on('processing-progress', (data: { videoId: string; progress: number; stage: string }) => {
+      if (data.videoId === videoId) {
+        console.log('Processing progress:', data.progress, '- Stage:', data.stage);
+        setProcessingProgress(data.progress);
+        setStatusMessage(`${data.stage}: ${data.progress}%`);
       }
     });
 
@@ -81,7 +95,8 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
       if (data.videoId === videoId) {
         console.log('Processing complete');
         setStatus('Uploaded');
-        setStatusMessage('Upload complete!');
+        setProcessingProgress(100);
+        setStatusMessage('Video ready!');
         setTimeout(() => {
           if (organizationId) {
             navigate(`/dashboard/${organizationId}`);
@@ -89,6 +104,15 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
             navigate('/');
           }
         }, 2000);
+      }
+    });
+
+    socket.on('processing-failed', (data: { videoId: string; error: string }) => {
+      if (data.videoId === videoId) {
+        console.log('Processing failed:', data.error);
+        setError(`Processing failed: ${data.error}`);
+        setLoading(false);
+        setStatus('');
       }
     });
 
@@ -110,7 +134,9 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
       socket.emit('leave-video-room', videoId);
       socket.off('upload-progress');
       socket.off('upload-complete');
+      socket.off('processing-progress');
       socket.off('processing-complete');
+      socket.off('processing-failed');
       socket.off('upload-error');
       socket.off('thumbnail-generated');
     };
@@ -290,6 +316,7 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
                     setSelectedFile(null);
                     setHttpProgress(0);
                     setGcsProgress(0);
+                    setProcessingProgress(0);
                     setStatus('');
                     setStatusMessage('');
                     setVideoId(null);
