@@ -24,7 +24,7 @@ const organizationSchema = new mongoose.Schema(
       sparse: true, // Allows multiple null values before slug is generated
       lowercase: true,
       trim: true,
-      index: true,
+      // Note: index defined separately below to avoid duplicates
     },
 
     // Owner of the organization (reference to User model)
@@ -32,7 +32,7 @@ const organizationSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: [true, "Owner is required"],
-      index: true,
+      // Note: index defined separately below to avoid duplicates
     },
 
     // Members with their roles and access levels
@@ -84,9 +84,9 @@ const organizationSchema = new mongoose.Schema(
 );
 
 // Indexes for efficient queries
+// Note: slug index is already created by unique: true constraint
 organizationSchema.index({ owner: 1 });
 organizationSchema.index({ "members.user": 1 });
-organizationSchema.index({ slug: 1 });
 
 /**
  * Pre-save middleware: Generate slug from name

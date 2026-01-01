@@ -98,31 +98,66 @@ const uploadVideo = async (req, res, next) => {
 
     const videoId = video._id.toString();
     const roomId = `video-${videoId}`;
+    const filePath = req.file.path;
+    const mimeType = req.file.mimetype;
+    const fileSize = req.file.size;
 
-    // Emit initial upload start
+    // Send response IMMEDIATELY so client can join socket room
+    res.status(201).json({
+      success: true,
+      message: "Video upload started",
+      data: {
+        video: {
+          id: video._id,
+          title: video.title,
+          status: video.status,
+          uploadProgress: 0,
+        },
+        roomId, // Return roomId for Socket.io connection
+      },
+    });
+
+    // Start async upload to GCS (after response is sent)
+    // Small delay to ensure client joins room first
+    setTimeout(() => {
+      uploadToGCS(videoId, gcsFileName, filePath, mimeType, fileSize, io, roomId);
+    }, 500);
+
+  } catch (error) {
+    console.error("Upload error:", error);
+    next(error);
+  }
+};
+
+/**
+ * Async function to upload video to GCS with progress tracking
+ * Runs after HTTP response is sent so client can join socket room
+ */
+const uploadToGCS = async (videoId, gcsFileName, filePath, mimeType, fileSize, io, roomId) => {
+  try {
+    const file = bucket.file(gcsFileName);
+    const stream = fs.createReadStream(filePath);
+
+    // Track upload progress
+    let uploadedBytes = 0;
+    const totalBytes = fileSize;
+
+    // Emit initial progress
     if (io) {
       io.to(roomId).emit("upload-progress", {
         videoId,
-        progress: 0,
+        progress: 1,
         status: "Uploading",
       });
     }
 
-    // Upload to Google Cloud Storage with progress tracking
-    const file = bucket.file(gcsFileName);
-    const stream = fs.createReadStream(req.file.path);
-
-    // Track upload progress
-    let uploadedBytes = 0;
-    const totalBytes = req.file.size;
-
     stream.on("data", (chunk) => {
       uploadedBytes += chunk.length;
-      const progress = Math.round((uploadedBytes / totalBytes) * 100);
+      const progress = Math.min(Math.round((uploadedBytes / totalBytes) * 100), 99);
 
       // Update database
       Video.findByIdAndUpdate(videoId, { uploadProgress: progress }, { new: true })
-        .then((updatedVideo) => {
+        .then(() => {
           // Emit progress update via Socket.io
           if (io) {
             io.to(roomId).emit("upload-progress", {
@@ -141,13 +176,28 @@ const uploadVideo = async (req, res, next) => {
         .pipe(
           file.createWriteStream({
             metadata: {
-              contentType: req.file.mimetype,
+              contentType: mimeType,
             },
             resumable: false,
           })
         )
-        .on("error", (error) => {
-          console.error("Upload error:", error);
+        .on("error", async (error) => {
+          console.error("GCS Upload error:", error);
+          // Update video status to failed
+          await Video.findByIdAndUpdate(videoId, { 
+            status: "Failed",
+            errorMessage: error.message 
+          });
+          if (io) {
+            io.to(roomId).emit("upload-error", {
+              videoId,
+              error: "Upload failed. Please try again.",
+            });
+          }
+          // Clean up temp file
+          if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+          }
           reject(error);
         })
         .on("finish", async () => {
@@ -159,14 +209,21 @@ const uploadVideo = async (req, res, next) => {
             const publicUrl = `https://storage.googleapis.com/${process.env.GCP_BUCKET_NAME}/${gcsFileName}`;
 
             // Update video document
-            video.rawView = publicUrl;
-            video.uploadProgress = 100;
-            video.status = "Processing";
-            video.processingProgress = 0;
-            await video.save();
+            await Video.findByIdAndUpdate(videoId, {
+              rawView: publicUrl,
+              uploadProgress: 100,
+              status: "Processing",
+              processingProgress: 0,
+            });
 
             // Emit upload complete
             if (io) {
+              io.to(roomId).emit("upload-progress", {
+                videoId,
+                progress: 100,
+                status: "Uploading",
+              });
+              
               io.to(roomId).emit("upload-complete", {
                 videoId,
                 progress: 100,
@@ -176,24 +233,25 @@ const uploadVideo = async (req, res, next) => {
             }
 
             // Generate thumbnail from video
-            await generateThumbnail(req.file.path, videoId, io, roomId);
+            await generateThumbnail(filePath, videoId, io, roomId);
 
             // Clean up temporary file
-            fs.unlinkSync(req.file.path);
+            if (fs.existsSync(filePath)) {
+              fs.unlinkSync(filePath);
+            }
 
-            // Start video processing (you can trigger your video processor here)
+            // Start video processing
             // For now, we'll just update status to "Uploaded" after a delay
-            // In production, you'd trigger your video processing worker
             setTimeout(async () => {
-              video.status = "Uploaded";
-              video.processingProgress = 100;
-              await video.save();
+              await Video.findByIdAndUpdate(videoId, {
+                status: "Uploaded",
+                processingProgress: 100,
+              });
 
               if (io) {
                 io.to(roomId).emit("processing-complete", {
                   videoId,
                   status: "Uploaded",
-                  videoUrl: video.videoUrl,
                 });
               }
             }, 2000); // Simulate processing delay
@@ -204,23 +262,8 @@ const uploadVideo = async (req, res, next) => {
           }
         });
     });
-
-    res.status(201).json({
-      success: true,
-      message: "Video uploaded successfully",
-      data: {
-        video: {
-          id: video._id,
-          title: video.title,
-          status: video.status,
-          uploadProgress: video.uploadProgress,
-        },
-        roomId, // Return roomId for Socket.io connection
-      },
-    });
   } catch (error) {
-    console.error("Upload error:", error);
-    next(error);
+    console.error("uploadToGCS error:", error);
   }
 };
 

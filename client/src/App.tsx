@@ -71,7 +71,7 @@ function App() {
                   path="/"
                   element={
                     <ProtectedRoute>
-                      <VideoList />
+                      <VideoList isPublic={true} />
                     </ProtectedRoute>
                   }
                 />

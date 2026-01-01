@@ -107,14 +107,24 @@ export const getVideoById = async (id: string): Promise<VideoResponse> => {
 };
 
 /**
- * Upload video
+ * Upload video with progress tracking
+ * @param formData - Form data containing video file and metadata
+ * @param onUploadProgress - Callback for HTTP upload progress (client -> server)
  */
 export const uploadVideo = async (
-  formData: FormData
+  formData: FormData,
+  onUploadProgress?: (progress: number) => void
 ): Promise<UploadResponse> => {
   const response = await api.post<UploadResponse>('/videos/upload', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
+    },
+    onUploadProgress: (progressEvent) => {
+      if (progressEvent.total && onUploadProgress) {
+        // HTTP upload progress (file going from client to server)
+        const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onUploadProgress(progress);
+      }
     },
   });
   return response.data;

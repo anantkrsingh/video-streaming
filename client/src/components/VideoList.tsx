@@ -33,13 +33,15 @@ interface VideoListProps {
   organizationId?: string;
   organizationRole?: string; // User's role in the organization (owner, admin, editor, viewer)
   hideHeader?: boolean; // Hide AppBar when embedded in dashboard
+  isPublic?: boolean; // Public view - show only uploaded videos, no actions
 }
 
 /**
  * Video List Component
  * Displays all videos with search and filtering capabilities
+ * Public view (/) shows only uploaded videos without actions or tags
  */
-const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole, hideHeader = false }) => {
+const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole, hideHeader = false, isPublic = false }) => {
   const [videos, setVideos] = useState<Video[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
@@ -55,7 +57,9 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
   const fetchVideos = async () => {
     try {
       setLoading(true);
-      const response = await getAllVideos(searchQuery, undefined, page, 12, organizationId);
+      // Public view only shows "Uploaded" videos
+      const statusFilter = isPublic ? 'Uploaded' : undefined;
+      const response = await getAllVideos(searchQuery, statusFilter, page, 12, organizationId);
       setVideos(response.data.videos);
       setTotalPages(response.data.pagination.pages);
     } catch (error) {
@@ -67,7 +71,7 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
 
   useEffect(() => {
     fetchVideos();
-  }, [page, organizationId]);
+  }, [page, organizationId, isPublic]);
 
   // Debounce search
   useEffect(() => {
@@ -124,9 +128,12 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
   };
 
   // Check if user can manage videos (based on org role or global role)
-  const canManageVideos = organizationRole 
-    ? ['owner', 'admin', 'editor'].includes(organizationRole)
-    : (user?.role === 'editor' || user?.role === 'admin');
+  // Public view never shows management options
+  const canManageVideos = isPublic 
+    ? false 
+    : organizationRole 
+      ? ['owner', 'admin', 'editor'].includes(organizationRole)
+      : (user?.role === 'editor' || user?.role === 'admin');
 
   return (
     <Box>
@@ -215,18 +222,21 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
                       ) : (
                         <PlayArrow sx={{ fontSize: 60, color: 'grey.500' }} />
                       )}
-                      <Chip
-                        label={video.status}
-                        color={getStatusColor(video.status) as any}
-                        size="small"
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                        }}
-                      />
-                      {/* Show action menu if user can manage or is the uploader */}
-                      {(canManageVideos || user?.id === video.uploadedBy._id) && (
+                      {/* Hide status chip on public view since all are "Uploaded" */}
+                      {!isPublic && (
+                        <Chip
+                          label={video.status}
+                          color={getStatusColor(video.status) as any}
+                          size="small"
+                          sx={{
+                            position: 'absolute',
+                            top: 8,
+                            right: 8,
+                          }}
+                        />
+                      )}
+                      {/* Show action menu if user can manage or is the uploader (not on public view) */}
+                      {!isPublic && (canManageVideos || user?.id === video.uploadedBy._id) && (
                         <IconButton
                           sx={{
                             position: 'absolute',
@@ -249,7 +259,8 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
                     <Typography variant="body2" color="text.secondary" noWrap>
                       {video.description || 'No description'}
                     </Typography>
-                    {video.tags.length > 0 && (
+                    {/* Hide tags on public view */}
+                    {!isPublic && video.tags.length > 0 && (
                       <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {video.tags.slice(0, 3).map((tag) => (
                           <Chip key={tag} label={tag} size="small" />
@@ -288,17 +299,19 @@ const VideoList: React.FC<VideoListProps> = ({ organizationId, organizationRole,
         </>
       )}
 
-      {/* Context Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleDelete}>
-          <Delete sx={{ mr: 1 }} />
-          Delete
-        </MenuItem>
+      {/* Context Menu - only show when not public view */}
+      {!isPublic && (
+        <Menu
+          anchorEl={anchorEl}
+          open={Boolean(anchorEl)}
+          onClose={handleMenuClose}
+        >
+          <MenuItem onClick={handleDelete}>
+            <Delete sx={{ mr: 1 }} />
+            Delete
+          </MenuItem>
         </Menu>
+      )}
       </Container>
     </Box>
   );

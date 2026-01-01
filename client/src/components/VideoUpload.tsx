@@ -23,6 +23,7 @@ interface VideoUploadProps {
 /**
  * Video Upload Component
  * Handles video upload with real-time progress tracking
+ * Shows two phases: HTTP upload (client->server) and GCS upload (server->cloud)
  */
 const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
   const [title, setTitle] = useState('');
@@ -30,8 +31,10 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [httpProgress, setHttpProgress] = useState(0); // Client -> Server progress
+  const [gcsProgress, setGcsProgress] = useState(0); // Server -> Cloud progress
   const [status, setStatus] = useState<string>('');
+  const [statusMessage, setStatusMessage] = useState<string>('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [videoId, setVideoId] = useState<string | null>(null);
@@ -39,33 +42,61 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
   const { socket } = useSocket();
   const navigate = useNavigate();
 
-  // Listen for upload progress updates
+  // Combined progress: HTTP upload (0-50%) + GCS upload (50-100%)
+  const totalProgress = status === 'Uploading to server' 
+    ? Math.round(httpProgress * 0.5) 
+    : status === 'Uploading' 
+      ? 50 + Math.round(gcsProgress * 0.5)
+      : status === 'Processing' || status === 'Uploaded'
+        ? 100
+        : 0;
+
+  // Listen for upload progress updates from server (GCS upload)
   useEffect(() => {
     if (!socket || !videoId) return;
 
-    const roomId = `video-${videoId}`;
+    // Join the video room to receive progress updates
     socket.emit('join-video-room', videoId);
+    console.log('Joined room for video:', videoId);
 
     socket.on('upload-progress', (data: { videoId: string; progress: number; status: string }) => {
       if (data.videoId === videoId) {
-        setUploadProgress(data.progress);
-        setStatus(data.status);
+        console.log('GCS upload progress:', data.progress);
+        setGcsProgress(data.progress);
+        setStatus('Uploading');
+        setStatusMessage(`Uploading to cloud: ${data.progress}%`);
       }
     });
 
     socket.on('upload-complete', (data: { videoId: string; status: string }) => {
       if (data.videoId === videoId) {
+        console.log('Upload complete');
         setStatus('Processing');
-        setUploadProgress(100);
+        setStatusMessage('Processing video...');
+        setGcsProgress(100);
       }
     });
 
     socket.on('processing-complete', (data: { videoId: string; status: string }) => {
       if (data.videoId === videoId) {
+        console.log('Processing complete');
         setStatus('Uploaded');
+        setStatusMessage('Upload complete!');
         setTimeout(() => {
-          navigate('/');
+          if (organizationId) {
+            navigate(`/dashboard/${organizationId}`);
+          } else {
+            navigate('/');
+          }
         }, 2000);
+      }
+    });
+
+    socket.on('upload-error', (data: { videoId: string; error: string }) => {
+      if (data.videoId === videoId) {
+        setError(data.error);
+        setLoading(false);
+        setStatus('');
       }
     });
 
@@ -80,9 +111,10 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
       socket.off('upload-progress');
       socket.off('upload-complete');
       socket.off('processing-complete');
+      socket.off('upload-error');
       socket.off('thumbnail-generated');
     };
-  }, [socket, videoId, navigate]);
+  }, [socket, videoId, navigate, organizationId]);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -111,16 +143,22 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
     e.preventDefault();
     setError('');
     setLoading(true);
+    setHttpProgress(0);
+    setGcsProgress(0);
+    setStatus('Uploading to server');
+    setStatusMessage('Uploading to server: 0%');
 
     if (!title.trim()) {
       setError('Title is required');
       setLoading(false);
+      setStatus('');
       return;
     }
 
     if (!selectedFile) {
       setError('Please select a video file');
       setLoading(false);
+      setStatus('');
       return;
     }
 
@@ -132,13 +170,21 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
       if (tags.length > 0) formData.append('tags', JSON.stringify(tags));
       if (organizationId) formData.append('organizationId', organizationId);
 
-      const response = await uploadVideo(formData);
+      // Upload with HTTP progress tracking
+      const response = await uploadVideo(formData, (progress) => {
+        setHttpProgress(progress);
+        setStatusMessage(`Uploading to server: ${progress}%`);
+      });
+
+      // Got videoId, now socket will receive GCS progress
       setVideoId(response.data.video.id);
-      setStatus(response.data.video.status);
-      setUploadProgress(response.data.video.uploadProgress);
+      setStatus('Uploading');
+      setStatusMessage('Preparing cloud upload...');
+      
     } catch (err: any) {
       setError(err.response?.data?.message || 'Upload failed. Please try again.');
       setLoading(false);
+      setStatus('');
     }
   };
 
@@ -242,8 +288,10 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
                   size="small"
                   onClick={() => {
                     setSelectedFile(null);
-                    setUploadProgress(0);
+                    setHttpProgress(0);
+                    setGcsProgress(0);
                     setStatus('');
+                    setStatusMessage('');
                     setVideoId(null);
                   }}
                   disabled={loading || status === 'Processing' || status === 'Uploaded'}
@@ -254,12 +302,20 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
             )}
           </Box>
 
-          {(status === 'Uploading' || status === 'Processing') && (
+          {/* Progress Section */}
+          {(status === 'Uploading to server' || status === 'Uploading' || status === 'Processing') && (
             <Box sx={{ mt: 2, mb: 2 }}>
-              <Typography variant="body2" gutterBottom>
-                {status}: {uploadProgress}%
+              <Typography variant="body2" gutterBottom sx={{ fontWeight: 'medium' }}>
+                {statusMessage}
               </Typography>
-              <LinearProgress variant="determinate" value={uploadProgress} />
+              <LinearProgress 
+                variant="determinate" 
+                value={totalProgress} 
+                sx={{ height: 10, borderRadius: 5 }}
+              />
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>
+                Overall progress: {totalProgress}%
+              </Typography>
             </Box>
           )}
 
@@ -269,12 +325,19 @@ const VideoUpload: React.FC<VideoUploadProps> = ({ organizationId }) => {
             </Alert>
           )}
 
+          {/* Error from socket */}
+          {status === '' && error && loading === false && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {error}
+            </Alert>
+          )}
+
           <Button
             type="submit"
             variant="contained"
             fullWidth
             sx={{ mt: 3 }}
-            disabled={loading || !selectedFile || status === 'Processing' || status === 'Uploaded'}
+            disabled={loading || !selectedFile || status !== ''}
           >
             {loading ? 'Uploading...' : 'Upload Video'}
           </Button>
