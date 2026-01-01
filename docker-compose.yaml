@@ -20,7 +20,7 @@ services:
       - GCP_BUCKET_NAME=${GCP_BUCKET_NAME}
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
-      - CLIENT_URL=${CLIENT_URL:-http://localhost}
+      - CLIENT_URL=${CLIENT_URL:-http://localhost:3001}
     volumes:
       - ./server/service-account.json:/app/service-account.json:ro
       - server-temp:/app/temp
@@ -43,7 +43,7 @@ services:
     container_name: video-streaming-client
     restart: unless-stopped
     ports:
-      - "80:80"
+      - "3001:3001"
     depends_on:
       server:
         condition: service_healthy
